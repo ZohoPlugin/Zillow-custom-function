@@ -1,0 +1,85 @@
+zwsid = "X1-ZWz1fj5g1cq3nv_4zss3";
+rec_id = input.lead.get("Leads.ID");
+lead_info = zoho.crm.getRecordById("Leads", rec_id.toLong());
+rec_street = lead_info.get("Property Address");
+rec_city = lead_info.get("Property City");
+rec_state = lead_info.get("Property State");
+rec_zip = lead_info.get("Property Zipcode");
+updateMap = map();
+updateMap.put("Zillow Property ID", "");
+updateMap.put("Zillow Home Value", "");
+updateMap.put("Zillow Bathrooms", "");
+updateMap.put("Zillow Bedrooms", "");
+updateMap.put("Zillow Last Sold Date", "");
+updateMap.put("Zillow Last Sold Price", "");
+updateMap.put("Zillow Lot Size", "");
+updateMap.put("Zillow Square Feet", "");
+updateMap.put("Zillow Tax Assessment", "");
+updateMap.put("Zillow Tax Assessment Year", "");
+updateMap.put("Zillow Value Range High", "");
+updateMap.put("Zillow Value Range Low", "");
+updateMap.put("Zillow Year Built", "");
+if (((rec_street != null) && (rec_city != null)) && (rec_state != null))
+{
+citystatezip = "";
+if (rec_zip != null)
+{
+citystatezip = rec_city + " " + rec_state + " " + rec_zip;
+}
+else
+{
+citystatezip = rec_city + " " + rec_state;
+}
+rec_street = rec_street.replaceAll(" ",("+"));
+citystatezip = citystatezip.replaceAll(" ",("+"));          property_resp=getUrl("http://www.zillow.com/webservice/GetDeepSearchResults.htm?zws-id=" + zwsid + "&address=" + rec_street + "&citystatezip=" + citystatezip,false);
+property_result = property_resp.get("responseText");
+zipid = "";
+if (property_result != "")
+{
+property_result = property_result.replaceAll("&","&amp;");
+zipid = property_result.executeXPath("/SearchResults:searchresults/response/results/result/zpid/text()");
+zipid1 = zipid.toList("-|-").get(0);
+home_value = property_result.executeXPath("/SearchResults:searchresults/response/results/result/zestimate/amount/text()");
+home_value1 = home_value.toList("-|-").get(0);
+bathrooms = property_result.executeXPath("/SearchResults:searchresults/response/results/result/bathrooms/text()");
+bathrooms1 = bathrooms.toList("-|-").get(0);
+bedrooms = property_result.executeXPath("/SearchResults:searchresults/response/results/result/bedrooms/text()");
+bedrooms1 = bedrooms.toList("-|-").get(0);
+last_sold_date = property_result.executeXPath("/SearchResults:searchresults/response/results/result/lastSoldDate/text()");
+last_sold_date1 = last_sold_date.toList("-|-").get(0);
+last_sold_price = property_result.executeXPath("/SearchResults:searchresults/response/results/result/lastSoldPrice/text()");
+last_sold_price1 = last_sold_price.toList("-|-").get(0);
+lot_size = property_result.executeXPath("/SearchResults:searchresults/response/results/result/lotSizeSqFt/text()");
+lot_size1 = lot_size.toList("-|-").get(0);
+sqft = property_result.executeXPath("/SearchResults:searchresults/response/results/result/finishedSqFt/text()");
+sqft1 = sqft.toList("-|-").get(0);
+tax_assessment = property_result.executeXPath("/SearchResults:searchresults/response/results/result/taxAssessment/text()");
+tax_assessment1 = tax_assessment.toList("-|-").get(0);
+tax_assessment_year = property_result.executeXPath("/SearchResults:searchresults/response/results/result/taxAssessmentYear/text()");
+tax_assessment_year1 = tax_assessment_year.toList("-|-").get(0);
+value_range_high = property_result.executeXPath("/SearchResults:searchresults/response/results/result/zestimate/valuationRange/high/text()");
+value_range_high1 = value_range_high.toList("-|-").get(0);
+value_range_low = property_result.executeXPath("/SearchResults:searchresults/response/results/result/zestimate/valuationRange/low/text()");
+value_range_low1 = value_range_low.toList("-|-").get(0);
+year_built = property_result.executeXPath("/SearchResults:searchresults/response/results/result/yearBuilt/text()");
+year_built1 = year_built.toList("-|-").get(0);
+if ((zipid != null) && (zipid != ""))
+{
+updateMap.put("Zillow Property ID", zipid1);
+updateMap.put("Zillow Home Value", home_value1);
+updateMap.put("Zillow Bathrooms", bathrooms1.toLong());
+updateMap.put("Zillow Bedrooms", bedrooms1);
+updateMap.put("Zillow Last Sold Date", last_sold_date1);
+updateMap.put("Zillow Last Sold Price", last_sold_price1);
+updateMap.put("Zillow Lot Size", lot_size1);
+updateMap.put("Zillow Square Feet", sqft1);
+updateMap.put("Zillow Tax Assessment", tax_assessment1);
+updateMap.put("Zillow Tax Assessment Year", tax_assessment_year1);
+updateMap.put("Zillow Value Range High", value_range_high1);
+updateMap.put("Zillow Value Range Low", value_range_low1);
+updateMap.put("Zillow Year Built", year_built1);
+}
+}
+}
+resp = zoho.crm.updateRecord("Leads", rec_id + "", updateMap);
+info resp;   
