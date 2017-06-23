@@ -1,0 +1,114 @@
+zwsid = "X1-ZWz1f9wjjmktmz_7q4l5";
+rec_id = input.lead.get("Leads.ID");
+lead_info = zoho.crm.getRecordById("Leads", rec_id.toLong());
+zpid = lead_info.get("Zillow Property ID");
+if ((zpid == null) || (zpid == ""))
+{
+rec_street = lead_info.get("Street");
+rec_city = lead_info.get("City");
+rec_state = lead_info.get("State");
+rec_zip = lead_info.get("Zip");
+if ((((((rec_street == null) || (rec_street == "")) || (rec_city == null)) || (rec_city == "")) || (rec_state == null)) || (rec_state == ""))
+{
+errorMsg = ("Street or City or State field is empty. Please check and update the address.");
+responseXML = "<error><message><![CDATA[" + errorMsg + "]]></message></error>";
+return responseXML;
+}
+citystatezip = "";
+if (rec_zip != null)
+{
+citystatezip = rec_city + " " + rec_state + " " + rec_zip;
+}
+else
+{
+citystatezip = rec_city + " " + rec_state;
+}
+rec_street = rec_street.replaceAll(","," ");
+rec_street = rec_street.replaceAll(" ",("+"));
+citystatezip = citystatezip.replaceAll(" ",("+"));
+property_resp = getUrl("http://www.zillow.com/webservice/GetDeepSearchResults.htm?zws-id=" + zwsid + "&address=" + rec_street + "&citystatezip=" + citystatezip,false);
+property_result = property_resp.get("responseText");
+if (property_result != "")
+{
+property_result = property_result.replaceAll("&","&amp;");
+resp_code = property_result.executeXPath("/SearchResults:searchresults/message/code/text()");
+if (resp_code == "0")
+{
+api_zpid = property_result.executeXPath("/SearchResults:searchresults/response/results/result/zpid/text()");
+api_zpid1 = api_zpid.toList("-|-").get(0);
+if ((api_zpid1 != null) && (api_zpid1 != ""))
+{
+zpid = api_zpid1;
+}
+}
+}
+}
+if ((zpid == null) || (zpid == ""))
+{
+errorMsg = ("Zillow property info not exists for this lead address. So, unable to get comparable homes.");
+responseXML = "<error><message><![CDATA[" + errorMsg + "]]></message></error>";
+return responseXML;
+}
+else
+{
+home_url = getUrl("http://www.zillow.com/webservice/GetDeepComps.htm?zws-id=" + zwsid + "&zpid=" + zpid + "&count=5",false);
+home_req = home_url.get("responseText");
+if (home_req != "")
+{
+comp_homes = home_req.executeXPath("/Comps:comps/response/properties/comparables");
+comp_homes = comp_homes.replaceAll("&","&amp;");
+total_homes = {1, 2, 3, 4, 5};
+index1 = 0;
+recordsXmlStr = "<record>";
+for each indexidx in total_homes
+{
+xpath_str = "//comp[" + indexidx + "]";
+comp_home_street = comp_homes.executeXPath(xpath_str + "/address/street/text()");
+if (comp_home_street != "")
+{
+comp_home_value = comp_homes.executeXPath(xpath_str + "/zestimate/amount/text()");
+comp_home_lowvalue = comp_homes.executeXPath(xpath_str + "/zestimate/valuationRange/low/text()");
+comp_home_highvalue = comp_homes.executeXPath(xpath_str + "/zestimate/valuationRange/high/text()");
+comp_home_valueRange = comp_home_lowvalue + " - " + comp_home_highvalue + " USD";
+comp_home_beds = comp_homes.executeXPath(xpath_str + "/bedrooms/text()");
+comp_home_baths = comp_homes.executeXPath(xpath_str + "/bathrooms/text()");
+comp_home_fsqft = comp_homes.executeXPath(xpath_str + "/finishedSqFt/text()");
+comp_home_info = (((comp_home_beds + " beds, " + (comp_home_baths.toLong())) + " baths, ") + comp_home_fsqft) + " sqft";
+comp_home_sqft = comp_homes.executeXPath(xpath_str + "/lotSizeSqFt/text()");
+comp_home_lsd = comp_homes.executeXPath(xpath_str + "/lastSoldDate/text()");
+if (comp_home_lsd == "")
+{
+comp_home_lsd = "No value";
+}
+comp_home_lsp = comp_homes.executeXPath(xpath_str + "/lastSoldPrice/text()");
+if (comp_home_lsp == "")
+{
+comp_home_lsp = "No value";
+}
+else
+{
+comp_home_lsp = "$" + comp_home_lsp;
+}
+comp_home_links = comp_homes.executeXPath(xpath_str + "/links/homedetails/text()");
+recordsXmlStr = recordsXmlStr + "<row no='" + index1 + "'>";
+recordsXmlStr = recordsXmlStr + "<FL val='Street' link='true' url='" + comp_home_links + "'><![CDATA[" + comp_home_street + "]]></FL>";
+recordsXmlStr = recordsXmlStr + "<FL val='Home Value'> $" + comp_home_value + "</FL>";
+recordsXmlStr = recordsXmlStr + "<FL val='Home Info'>" + comp_home_info + "</FL>";
+recordsXmlStr = recordsXmlStr + "<FL val='Value Range'>" + comp_home_valueRange + "</FL>";
+recordsXmlStr = recordsXmlStr + "<FL val='Sold Price'> " + comp_home_lsp + "</FL>";
+recordsXmlStr = recordsXmlStr + "<FL val='Sold Date'>" + comp_home_lsd + "</FL>";
+recordsXmlStr = recordsXmlStr + "<FL val='Lot Size(sqft)'>" + comp_home_sqft + "</FL>";
+recordsXmlStr = recordsXmlStr + "</row>";
+}
+index1 = (index1 + 1);
+}
+recordsXmlStr = recordsXmlStr + "</record>";
+return recordsXmlStr;
+}
+else
+{
+errorMsg = "Unable to fetch comparable homes for this Zillow property.";
+responseXML = "<error><message><![CDATA[" + errorMsg + "]]></message></error>";
+return responseXML;
+}
+}
