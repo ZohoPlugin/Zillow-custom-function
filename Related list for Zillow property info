@@ -1,0 +1,121 @@
+zwsid = "X1-ZWz1f9wjjmktmz_7q4l5";
+rec_id = input.lead.get("Leads.ID");
+lead_info = zoho.crm.getRecordById("Leads", rec_id.toLong());
+rec_street = lead_info.get("Street");
+rec_city = lead_info.get("City");
+rec_state = lead_info.get("State");
+rec_zip = lead_info.get("Zip");
+if ((((((rec_street == null) || (rec_street == "")) || (rec_city == null)) || (rec_city == "")) || (rec_state == null)) || (rec_state == ""))
+{
+errorMsg = ("Street or City or State field is empty. Please check and update the address.");
+responseXML = "<error><message><![CDATA[" + errorMsg + "]]></message></error>";
+return responseXML;
+}
+citystatezip = "";
+if (rec_zip != null)
+{
+citystatezip = rec_city + " " + rec_state + " " + rec_zip;
+}
+else
+{
+citystatezip = rec_city + " " + rec_state;
+}
+rec_street = rec_street.replaceAll(","," ");
+rec_street = rec_street.replaceAll(" ",("+"));
+citystatezip = citystatezip.replaceAll(" ",("+"));
+property_resp = getUrl("http://www.zillow.com/webservice/GetDeepSearchResults.htm?zws-id=" + zwsid + "&address=" + rec_street + "&citystatezip=" + citystatezip,false);
+property_result = property_resp.get("responseText");
+if (property_result != "")
+{
+property_result = property_result.replaceAll("&","&amp;");
+resp_code = property_result.executeXPath("/SearchResults:searchresults/message/code/text()");
+if (resp_code == "")
+{
+errorMsg = "Unable to fetch property info from Zillow.";
+responseXML = "<error><message><![CDATA[" + errorMsg + "]]></message></error>";
+return responseXML;
+}
+if (resp_code != "0")
+{
+resp_mesg = property_result.executeXPath("/SearchResults:searchresults/message/text/text()");
+errorMsg = "Unable to fetch property info from Zillow (Zillow " + resp_mesg + ")";
+responseXML = "<error><message><![CDATA[" + errorMsg + "]]></message></error>";
+return responseXML;
+}
+api_zpid = property_result.executeXPath("/SearchResults:searchresults/response/results/result/zpid/text()");
+home_value = property_result.executeXPath("/SearchResults:searchresults/response/results/result/zestimate/amount/text()");
+street = property_result.executeXPath("/SearchResults:searchresults/response/results/result/address/street/text()");
+low_value = property_result.executeXPath("/SearchResults:searchresults/response/results/result/zestimate/valuationRange/low/text()");
+high_value = property_result.executeXPath("/SearchResults:searchresults/response/results/result/zestimate/valuationRange/high/text()");
+value_range = low_value + " - " + high_value + " USD ";
+bathrooms = property_result.executeXPath("/SearchResults:searchresults/response/results/result/bathrooms/text()");
+bedrooms = property_result.executeXPath("/SearchResults:searchresults/response/results/result/bedrooms/text()");
+finishedSqft = property_result.executeXPath("/SearchResults:searchresults/response/results/result/finishedSqFt/text()");
+home_info = (((bedrooms + " beds, " + (bathrooms.toLong())) + " baths, ") + finishedSqft) + " sqft";
+sqft = property_result.executeXPath("/SearchResults:searchresults/response/results/result/lotSizeSqFt/text()");
+lsd = property_result.executeXPath("/SearchResults:searchresults/response/results/result/lastSoldDate/text()");
+last_sold = "";
+if (lsd == "")
+{
+last_sold = "-";
+}
+else
+{
+lsp = property_result.executeXPath("/SearchResults:searchresults/response/results/result/lastSoldPrice/text()");
+last_sold = lsd + " for $" + lsp;
+}
+tay = property_result.executeXPath("/SearchResults:searchresults/response/results/result/taxAssessmentYear/text()");
+ta = property_result.executeXPath("/SearchResults:searchresults/response/results/result/taxAssessment/text()");
+if (ta == "")
+{
+home_tax = "-";
+}
+else
+{
+home_tax = "$" + ta + " (" + tay + ")";
+}
+year_built = property_result.executeXPath("/SearchResults:searchresults/response/results/result/yearBuilt/text()");
+home_links = property_result.executeXPath("/SearchResults:searchresults/response/results/result/links/homedetails/text()");
+//index1 = 0;
+recordsXmlStr = "<record>";
+if ((api_zpid != null) && (api_zpid != ""))
+{
+zipid = lead_info.get("Zillow Property ID");
+if ((zipid == null) || (zipid == ""))
+{
+valMap = map();
+valMap.put("Zillow Property ID", api_zpid);
+valMap.put("Zillow Home Value", home_value);
+valMap.put("Zillow Bathrooms", bathrooms.toLong());
+valMap.put("Zillow Bedrooms", bedrooms);
+valMap.put("Zillow Last Sold Date", lsd);
+valMap.put("Zillow Last Sold Price", lsp);
+valMap.put("Zillow Lot Size", sqft);
+valMap.put("Zillow Square Feet", finishedSqft);
+valMap.put("Zillow Tax Assessment", ta);
+valMap.put("Zillow Tax Assessment Year", tay);
+valMap.put("Zillow Value Range High", high_value);
+valMap.put("Zillow Value Range Low", low_value);
+valMap.put("Zillow Year Built", year_built);
+updateResp = zoho.crm.updateRecord("Leads", rec_id + "", valMap);
+}
+recordsXmlStr = recordsXmlStr + "<row no='0'>";
+recordsXmlStr = recordsXmlStr + "<FL val ='Street' link='true' url='" + home_links + "'>" + street + "</FL>";
+recordsXmlStr = recordsXmlStr + "<FL val='Home Info'>" + home_info + "</FL>";
+recordsXmlStr = recordsXmlStr + "<FL val='Value Range'>" + value_range + "</FL>";
+recordsXmlStr = recordsXmlStr + "<FL val='Last Sold'> " + last_sold + "</FL>";
+recordsXmlStr = recordsXmlStr + "<FL val='Lot Size (sqft)'>" + sqft + "</FL>";
+recordsXmlStr = recordsXmlStr + "<FL val='Tax Assessment'>" + home_tax + "</FL>";
+recordsXmlStr = recordsXmlStr + "<FL val='Year Built'>" + year_built + "</FL>";
+recordsXmlStr = recordsXmlStr + "</row>";
+}
+recordsXmlStr = recordsXmlStr + "</record>";
+return recordsXmlStr;
+}
+else
+{
+errorMsg = "Unable to fetch property info from Zillow.";
+responseXML = "<error><message><![CDATA[" + errorMsg + "]]></message></error>";
+return responseXML;
+}
+ 
