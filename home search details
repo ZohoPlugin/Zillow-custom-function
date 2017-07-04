@@ -1,0 +1,35 @@
+zwsid = zoho.crm.getOrgVariable("zillowextension0.zillowapi");
+  rec_id = input.lead.get("Leads.ID");
+ l ead_info = zoho.crm.getRecordById("Leads", rec_id.toLong());
+  mailing_street = lead_info.get("Street");
+  mailing_city = lead_info.get("City");
+  mailing_state = lead_info.get("State");
+  mailing_zip = lead_info.get("Zip Code");
+  //GET CRMRECORDS and Store them. This part would be pushed to Zillow to fetch Home Information.  
+  updateMap = map();
+  citystatezip = mailing_city + " " + mailing_state + " " + mailing_zip;
+ mailing_street = mailing_street.replaceAll(","," ");
+  mailing_street = mailing_street.replaceAll(" ",("+"));
+  citystatezip = citystatezip.replaceAll(" ",("+"));
+  //We Parse the Stored info to the API standards and make the URL ready.  
+  property_resp = getUrl("http://www.zillow.com/webservice/GetDeepSearchResults.htm?zws-id=" + zwsid + "&address=" + mailing_street + "&citystatezip=" + citystatezip,false);
+  property_result = property_resp.get("responseText");
+
+// With the Response we shall use XML Path traversal and move along the response from Zillow.  
+if (property_result != "") { property_result = property_result.replaceAll("&","&amp;");
+  resp_code = property_result.executeXPath("/SearchResults:searchresults/message/code/text()");
+  if (resp_code == "0") { zipid = property_result.executeXPath("/SearchResults:searchresults/response/results/result/zpid/text()");
+ zipid1 = zipid.toList("-|-").get(0);
+  home_value = property_result.executeXPath("/SearchResults:searchresults/response/results/result/zestimate/amount/text()");
+  home_value1 = home_value.toList("-|-").get(0);
+ last_sold_price = property_result.executeXPath("/SearchResults:searchresults/response/results/result/lastSoldPrice/text()");
+  last_sold_price1 = last_sold_price.toList("-|-").get(0);
+  sqft = property_result.executeXPath("/SearchResults:searchresults/response/results/result/finishedSqFt/text()");
+  sqft1 = sqft.toList("-|-").get(0);
+  //We create a map out of the Pulled out infomration from Zillow and get things ready to populate CRM fields.  updateMap.put("Zillow Property ID", zipid1);
+ updateMap.put("Zillow Home Value", home_value1);
+ updateMap.put("Zillow Last Sold Price", last_sold_price1);
+ updateMap.put("Zillow Square Feet", sqft1);
+ } }  resp = zoho.crm.updateRecord("Leads", rec_id + "", updateMap);
+
+//The Update Call to CRM to populate the fields.
