@@ -1,0 +1,49 @@
+// zwsid = zoho.crm.getOrgVariable("zillow api key");
+  zwsid = "X1-ZWz1fv40k5l5or_1vfab";
+  rec_id = input.lead.get("Leads.ID");
+  lead_info = zoho.crm.getRecordById("Leads", rec_id.toLong());
+  zpid = lead_info.get("Zillow Property ID");
+  home_url = getUrl("http://www.zillow.com/webservice/GetDeepComps.htm?zws-id=" + zwsid + "&zpid=" + zpid + "&count=5",false);
+  home_req = home_url.get("responseText");
+ //Traverse through the XML and get Sufficent Details for Related List    comp_homes = home_req.executeXPath("/Comps:comps/response/properties/comparables");
+  comp_homes = comp_homes.replaceAll("&","&amp;");
+  total_homes = {1, 2, 3, 4, 5};
+ index1 = 0;
+ recordsXmlStr = "<record>";
+  for each indexidx in total_homes //Traverse through the XML and get Sufficent Details for Related List    
+  comp_homes = home_req.executeXPath("/Comps:comps/response/properties/comparables");
+  comp_homes = comp_homes.replaceAll("&","&amp;");
+
+total_homes = {1, 2, 3, 4, 5};
+  index1 = 0;
+ recordsXmlStr = "<record>";
+  for each indexidx in total_homes {  xpath_str = "//comp[" + indexidx + "]";
+  comp_home_street = comp_homes.executeXPath(xpath_str + "/address/street/text()");
+  comp_home_value = comp_homes.executeXPath(xpath_str + "/zestimate/amount/text()");
+  comp_home_lowvalue = comp_homes.executeXPath(xpath_str + "/zestimate/valuationRange/low/text()");
+ omp_home_highvalue = comp_homes.executeXPath(xpath_str + "/zestimate/valuationRange/high/text()");
+  comp_home_valueRange = comp_home_lowvalue + " - " + comp_home_highvalue + " USD";
+  comp_home_beds = comp_homes.executeXPath(xpath_str + "/bedrooms/text()");
+  comp_home_baths = comp_homes.executeXPath(xpath_str + "/bathrooms/text()");
+ comp_home_info = (comp_home_beds + " beds, " + (comp_home_baths.toLong())) + " baths";
+  comp_home_sqft = comp_homes.executeXPath(xpath_str + "/lotSizeSqFt/text()");
+  comp_home_lsd = comp_homes.executeXPath(xpath_str + "/lastSoldDate/text()");
+
+if (comp_home_lsd == "")  {  comp_home_lsd = "No value";
+  }  comp_home_lsp = comp_homes.executeXPath(xpath_str + "/lastSoldPrice/text()");
+  if (comp_home_lsp == "") { comp_home_lsp = "No value";
+  }  else {  comp_home_lsp = "$" + comp_home_lsp;
+  }
+//Make the Output XML readable for the Custom Related List  comp_home_links = comp_homes.executeXPath(xpath_str + "/links/homedetails/text()");
+  recordsXmlStr = recordsXmlStr + "<row no='" + index1 + "'>";
+  recordsXmlStr = recordsXmlStr + "<FL val='Street' link='true' url='" + comp_home_links + "'>" + comp_home_street + "</FL>";
+  recordsXmlStr = recordsXmlStr + "<FL val='Home Value'> $" + comp_home_value + "</FL>";
+  recordsXmlStr = recordsXmlStr + "<FL val='Home Info'>" + comp_home_info + "</FL>";
+  recordsXmlStr = recordsXmlStr + "<FL val='Value Range'>" + comp_home_valueRange + "</FL>";
+  recordsXmlStr = recordsXmlStr + "<FL val='Sold Price'> " + comp_home_lsp + "</FL>";
+  recordsXmlStr = recordsXmlStr + "<FL val='Sold Date'>" + comp_home_lsd + "</FL>";
+  recordsXmlStr = recordsXmlStr + "<FL val='Sqft'>" + comp_home_sqft + "</FL>";
+  recordsXmlStr = recordsXmlStr + "</row>";
+ index1 = (index1 + 1);
+  }  recordsXmlStr = recordsXmlStr + "</record>";
+  return recordsXmlStr;
